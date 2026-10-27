@@ -31,7 +31,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cat ${{ github.event.inputs.puzzle }}/part* > /tmp/in.cnf.gz && python solve_gha.py /tmp/in.cnf.gz "${{ github.event.inputs.tlimit }}" "$(( ${{ matrix.idx }} * 1000 + RANDOM ))" || true
+          cat ${{ github.event.inputs.puzzle }}/part* > /tmp/in.cnf.gz && python solve_gha.py /tmp/in.cnf.gz "${{ github.event.inputs.tlimit }}" "$(( ${{ matrix.idx }} * 1000 + RANDOM ))" > out.log 2>&1 || true
+          name0=$(basename "${{ github.event.inputs.puzzle }}")
+          tail -c 1500 out.log > tail.log; nproc >> tail.log
+          gh api -X PUT "repos/${{ github.repository }}/contents/logs/${name0}-${{ matrix.idx }}.log" -f message="log" -f content="$(base64 -w0 tail.log)" || true
           if [ -s answer.txt ]; then
             name=$(basename "${{ github.event.inputs.puzzle }}")
             gh api -X PUT "repos/${{ github.repository }}/contents/answers/${name}-${{ matrix.idx }}.txt" -f message="answer" -f content="$(base64 -w0 answer.txt)" || true
