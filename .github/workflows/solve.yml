@@ -31,8 +31,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python solve_gha.py "${{ github.event.inputs.puzzle }}" "${{ github.event.inputs.tlimit }}" "$(( ${{ matrix.idx }} * 1000 + RANDOM ))" || true
+          cat ${{ github.event.inputs.puzzle }}/part* > /tmp/in.cnf.gz && python solve_gha.py /tmp/in.cnf.gz "${{ github.event.inputs.tlimit }}" "$(( ${{ matrix.idx }} * 1000 + RANDOM ))" || true
           if [ -s answer.txt ]; then
-            name=$(basename "${{ github.event.inputs.puzzle }}" .cnf.gz)
+            name=$(basename "${{ github.event.inputs.puzzle }}")
             gh api -X PUT "repos/${{ github.repository }}/contents/answers/${name}-${{ matrix.idx }}.txt" -f message="answer" -f content="$(base64 -w0 answer.txt)" || true
           fi
