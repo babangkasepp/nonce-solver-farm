@@ -1,0 +1,38 @@
+name: solve
+on:
+  workflow_dispatch:
+    inputs:
+      puzzle:
+        description: path of puzzle .cnf.gz in repo
+        required: true
+      tlimit:
+        description: seconds
+        required: false
+        default: "420"
+permissions:
+  contents: write
+jobs:
+  solve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        idx: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            solve_gha.py
+            ${{ github.event.inputs.puzzle }}
+          sparse-checkout-cone-mode: false
+      - run: pip install -q numpy numba
+      - name: solve
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python solve_gha.py "${{ github.event.inputs.puzzle }}" "${{ github.event.inputs.tlimit }}" "$(( ${{ matrix.idx }} * 1000 + RANDOM ))" || true
+          if [ -s answer.txt ]; then
+            name=$(basename "${{ github.event.inputs.puzzle }}" .cnf.gz)
+            gh api -X PUT "repos/${{ github.repository }}/contents/answers/${name}-${{ matrix.idx }}.txt" -f message="answer" -f content="$(base64 -w0 answer.txt)" || true
+          fi
