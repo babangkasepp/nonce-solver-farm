@@ -1,0 +1,51 @@
+name: solvec
+on:
+  workflow_dispatch:
+    inputs:
+      puzzle:
+        required: true
+      tlimit:
+        required: false
+        default: "420"
+permissions:
+  contents: write
+jobs:
+  solve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        idx: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            probsab.c
+            ${{ github.event.inputs.puzzle }}
+          sparse-checkout-cone-mode: false
+      - name: solve
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gcc -O3 -march=native -o probsab probsab.c -lm
+          cat ${{ github.event.inputs.puzzle }}/part* | gunzip | grep -v '^c' | sed '1s/^p cnf //' > in.txt
+          name=$(basename "${{ github.event.inputs.puzzle }}")
+          i=${{ matrix.idx }}
+          for b in 1.9 2.3 2.6 3.0 3.4 4.0; do :; done
+          betas=(1.9 2.2 2.5 2.8 3.1 3.4 3.8 4.2)
+          for j in 0 1 2 3; do
+            beta=${betas[$(( (i*4+j) % 8 ))]}
+            ( ./probsab in.txt $(( i*1000+j*17+RANDOM )) $beta ${{ github.event.inputs.tlimit }} > ans_$j.txt 2> err_$j.txt; echo "beta=$beta rc=$?" >> err_$j.txt ) &
+          done
+          end=$(( $(date +%s) + ${{ github.event.inputs.tlimit }} + 5 ))
+          while [ $(date +%s) -lt $end ]; do
+            for j in 0 1 2 3; do if [ -s ans_$j.txt ]; then
+              gh api -X PUT "repos/${{ github.repository }}/contents/answers/${name}-c${i}.txt" -f message="answer" -f content="$(head -1 ans_$j.txt | base64 -w0)" || true
+              pkill probsab; break 2; fi; done
+            sleep 1
+          done
+          wait || true
+          cat err_*.txt > tail.log || true
+          sleep $(( i % 10 ))
+          gh api -X PUT "repos/${{ github.repository }}/contents/logs/${name}-c${i}.log" -f message="log" -f content="$(base64 -w0 tail.log)" || true
